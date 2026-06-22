@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BC-80 Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg0:      #0a0b0d;
+    --bg1:      #111318;
+    --bg2:      #181c24;
+    --bg3:      #1f2430;
+    --border:   #2a3040;
+    --border-hi:#3d4f6e;
+    --accent:   #00c8ff;
+    --accent2:  #ff6b35;
+    --green:    #00e87a;
+    --red:      #ff3b5c;
+    --amber:    #ffb800;
+    --text:     #c8d4e8;
+    --text-dim: #5a6a88;
+    --text-lo:  #2e3a52;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Rajdhani', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg0);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── SCAN LINE overlay ── */
+  /* body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,.18) 2px,
+      rgba(0,0,0,.18) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  } */
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--bg1);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-logo {
+    width: 36px; height: 36px;
+    border: 2px solid var(--accent);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+
+  .brand-name {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .brand-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 6px var(--red);
+    animation: blink 1.4s ease-in-out infinite;
+    transition: background .3s, box-shadow .3s;
+  }
+  .status-dot.live {
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: none;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+  .status-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .clock {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+
+  /* ── MAIN GRID ── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+    height: calc(100vh - 57px);
+  }
+
+  /* ── VIDEO PANEL ── */
+  .video-panel {
+    grid-row: 1 / 3;
+    background: #000;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+  }
+
+  #video-feed {
+    width: 100%;
+    height: 100%;
+    /* object-fit: contain; */
+    /* display: block; */
+  }
+
+  .video-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* corner brackets */
+  .corner {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: .6;
+  }
+  .corner.tl { top:12px; left:12px;  border-width: 2px 0 0 2px; }
+  .corner.tr { top:12px; right:12px; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom:12px; left:12px;  border-width: 0 0 2px 2px; }
+  .corner.br { bottom:12px; right:12px; border-width: 0 2px 2px 0; }
+
+  .video-hud {
+    position: absolute;
+    bottom: 12px; left: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: rgba(0, 200, 255, .55);
+    letter-spacing: 1px;
+    line-height: 1.6;
+  }
+
+  .tally-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: var(--red);
+    box-shadow: 0 0 12px var(--red);
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .tally-bar.active { opacity: 1; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--bg1);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ── PANELS ── */
+  .panel {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--bg2);
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-head:hover { background: var(--bg3); }
+
+  .panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .panel-chevron {
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: transform .2s;
+  }
+  .panel.collapsed .panel-chevron { transform: rotate(-90deg); }
+  .panel.collapsed .panel-body    { display: none; }
+
+  .panel-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ── BUTTON GROUPS ── */
+  .btn-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 9px 6px;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all .12s ease;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+
+  .btn::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,.06);
+    opacity: 0;
+    transition: opacity .1s;
+  }
+
+  .btn:hover { border-color: var(--border-hi); color: #fff; }
+  .btn:hover::after { opacity: 1; }
+
+  .btn:active,
+  .btn.held {
+    background: var(--bg3);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 8px rgba(0,200,255,.2);
+  }
+
+  .btn.btn-accent {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn.btn-accent:hover,
+  .btn.btn-accent:active {
+    background: rgba(0,200,255,.12);
+    box-shadow: 0 0 10px rgba(0,200,255,.25);
+  }
+
+  .btn.btn-danger {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .btn.btn-danger:hover,
+  .btn.btn-danger:active {
+    background: rgba(255,59,92,.12);
+    box-shadow: 0 0 10px rgba(255,59,92,.25);
+  }
+
+  .btn.btn-warn {
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+  .btn.btn-warn:hover,
+  .btn.btn-warn:active {
+    background: rgba(255,184,0,.12);
+    box-shadow: 0 0 10px rgba(255,184,0,.25);
+  }
+
+  .btn.btn-green {
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .btn.btn-green:hover,
+  .btn.btn-green:active {
+    background: rgba(0,232,122,.1);
+    box-shadow: 0 0 10px rgba(0,232,122,.2);
+  }
+
+  .btn.btn-toggle.on {
+    background: rgba(0,200,255,.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn.btn-toggle.on::before {
+    content: '● ';
+    font-size: 9px;
+  }
+
+  /* ── PRESETS GRID ── */
+  .presets-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+  }
+
+  .preset-btn {
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all .12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .preset-btn:hover { border-color: var(--border-hi); color: var(--text); }
+  .preset-btn:active { border-color: var(--accent); color: var(--accent); background: var(--bg3); }
+
+  .preset-mode-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .preset-mode-btn {
+    flex: 1;
+    padding: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    color: var(--text-dim);
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all .12s;
+    text-align: center;
+  }
+
+  .preset-mode-btn.active {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: rgba(255,184,0,.1);
+  }
+
+  /* ── LABEL ── */
+  .label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+  }
+
+  /* ── FEEDBACK BAR ── */
+  #feedback {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 26px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    z-index: 100;
+  }
+
+  #fb-cmd  { color: var(--accent); }
+  #fb-resp { color: var(--green); }
+
+  /* ── SCROLLBAR ── */
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: var(--bg1); }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 640px) {
+    main { grid-template-columns: 1fr; grid-template-rows: 40vw 1fr; }
+    .video-panel { grid-row: 1; border-right: none; border-bottom: 1px solid var(--border); }
+    .sidebar { grid-row: 2; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="brand">
+    <div class="brand-logo">BC<br>80</div>
+    <div>
+      <div class="brand-name">Datavideo</div>
+      <div class="brand-sub">HD BLOCK CAMERA · DVIP/VISCA</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-label">
+      <div class="status-dot" id="conn-dot"></div>
+      <span id="conn-label">CONNECTING</span>
+    </div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main>
+
+  <!-- VIDEO -->
+  <div class="video-panel">
+    <div class="tally-bar" id="tally-bar"></div>
+    <img id="video-feed" src="/video_feed" alt="Live Feed">
+    <div class="video-overlay">
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+      <div class="video-hud">
+        <div>BC-80 · 1920×1080</div>
+        <div id="hud-mode">AF: AUTO · WB: AUTO · EXP: AUTO</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- ZOOM -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">Zoom</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="btn-row">
+          <button class="btn btn-accent"
+            id="btn-zoomin"
+            onmousedown="holdStart('/zoom_in','btn-zoomin')"
+            onmouseup="holdStop('/zoom_stop','btn-zoomin')"
+            onmouseleave="holdStop('/zoom_stop','btn-zoomin')"
+            ontouchstart="holdStart('/zoom_in','btn-zoomin')"
+            ontouchend="holdStop('/zoom_stop','btn-zoomin')">
+            ◂◂ TELE
+          </button>
+          <button class="btn btn-accent"
+            id="btn-zoomout"
+            onmousedown="holdStart('/zoom_out','btn-zoomout')"
+            onmouseup="holdStop('/zoom_stop','btn-zoomout')"
+            onmouseleave="holdStop('/zoom_stop','btn-zoomout')"
+            ontouchstart="holdStart('/zoom_out','btn-zoomout')"
+            ontouchend="holdStop('/zoom_stop','btn-zoomout')">
+            WIDE ▸▸
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOCUS -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">Focus</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="btn-row">
+          <button class="btn btn-accent"
+            id="btn-focusfar"
+            onmousedown="holdStart('/focus_far','btn-focusfar')"
+            onmouseup="holdStop('/focus_stop','btn-focusfar')"
+            onmouseleave="holdStop('/focus_stop','btn-focusfar')"
+            ontouchstart="holdStart('/focus_far','btn-focusfar')"
+            ontouchend="holdStop('/focus_stop','btn-focusfar')">
+            FAR
+          </button>
+          <button class="btn btn-accent"
+            id="btn-focusnear"
+            onmousedown="holdStart('/focus_near','btn-focusnear')"
+            onmouseup="holdStop('/focus_stop','btn-focusnear')"
+            onmouseleave="holdStop('/focus_stop','btn-focusnear')"
+            ontouchstart="holdStart('/focus_near','btn-focusnear')"
+            ontouchend="holdStop('/focus_stop','btn-focusnear')">
+            NEAR
+          </button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-green btn-toggle" id="btn-af"
+            onclick="toggleAF(this)">
+            AUTO FOCUS
+          </button>
+          <button class="btn" onclick="cmd('/one_push_focus')">
+            ONE PUSH
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- IRIS -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">Iris</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="btn-row">
+          <button class="btn"
+            id="btn-irisopen"
+            onmousedown="holdStart('/iris_open','btn-irisopen')"
+            onmouseup="holdStop('/iris_stop','btn-irisopen')"
+            onmouseleave="holdStop('/iris_stop','btn-irisopen')"
+            ontouchstart="holdStart('/iris_open','btn-irisopen')"
+            ontouchend="holdStop('/iris_stop','btn-irisopen')">
+            OPEN ▲
+          </button>
+          <button class="btn"
+            id="btn-irisclose"
+            onmousedown="holdStart('/iris_close','btn-irisclose')"
+            onmouseup="holdStop('/iris_stop','btn-irisclose')"
+            onmouseleave="holdStop('/iris_stop','btn-irisclose')"
+            ontouchstart="holdStart('/iris_close','btn-irisclose')"
+            ontouchend="holdStop('/iris_stop','btn-irisclose')">
+            CLOSE ▼
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAIN / SHUTTER -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">Gain &amp; Shutter</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="label">Gain</div>
+        <div class="btn-row">
+          <button class="btn" onclick="cmd('/gain_up')">GAIN +</button>
+          <button class="btn" onclick="cmd('/gain_down')">GAIN −</button>
+          <button class="btn" onclick="cmd('/gain_reset')">RESET</button>
+        </div>
+        <div class="label" style="margin-top:4px">Shutter</div>
+        <div class="btn-row">
+          <button class="btn" onclick="cmd('/shutter_up')">SHTR +</button>
+          <button class="btn" onclick="cmd('/shutter_down')">SHTR −</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXPOSURE MODE -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">Exposure Mode</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="btn-row">
+          <button class="btn btn-toggle" id="exp-auto"   onclick="setExp(this,'/exp_auto')">AUTO</button>
+          <button class="btn btn-toggle" id="exp-manual" onclick="setExp(this,'/exp_manual')">MANUAL</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-toggle" id="exp-shtr"   onclick="setExp(this,'/exp_shutter_priority')">SHTR PRI</button>
+          <button class="btn btn-toggle" id="exp-iris"   onclick="setExp(this,'/exp_iris_priority')">IRIS PRI</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- WHITE BALANCE -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">White Balance</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="btn-row">
+          <button class="btn btn-toggle" id="wb-auto"    onclick="setWB(this,'/wb_auto')">AUTO</button>
+          <button class="btn btn-toggle" id="wb-indoor"  onclick="setWB(this,'/wb_indoor')">3200K</button>
+          <button class="btn btn-toggle" id="wb-outdoor" onclick="setWB(this,'/wb_outdoor')">5600K</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="cmd('/wb_one_push')">ONE PUSH</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMAGE -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">Image</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="label">Backlight Compensation</div>
+        <div class="btn-row">
+          <button class="btn btn-toggle" id="bl-on"  onclick="cmdTogglePair('bl-on','bl-off','/backlight_on')">BLC ON</button>
+          <button class="btn btn-toggle on" id="bl-off" onclick="cmdTogglePair('bl-off','bl-on','/backlight_off')">BLC OFF</button>
+        </div>
+        <div class="label" style="margin-top:4px">Mirror</div>
+        <div class="btn-row">
+          <button class="btn btn-toggle" id="mlr-on"  onclick="cmdTogglePair('mlr-on','mlr-off','/mirror_lr_on')">FLIP H</button>
+          <button class="btn btn-toggle on" id="mlr-off" onclick="cmdTogglePair('mlr-off','mlr-on','/mirror_lr_off')">H OFF</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-toggle" id="mtb-on"  onclick="cmdTogglePair('mtb-on','mtb-off','/mirror_tb_on')">FLIP V</button>
+          <button class="btn btn-toggle on" id="mtb-off" onclick="cmdTogglePair('mtb-off','mtb-on','/mirror_tb_off')">V OFF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRESETS -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">Presets</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="preset-mode-row">
+          <div class="preset-mode-btn active" id="pm-recall" onclick="setPresetMode('recall')">RECALL</div>
+          <div class="preset-mode-btn" id="pm-set" onclick="setPresetMode('set')">SET</div>
+        </div>
+        <div class="presets-grid">
+          <div class="preset-btn" onclick="doPreset(0)">0</div>
+          <div class="preset-btn" onclick="doPreset(1)">1</div>
+          <div class="preset-btn" onclick="doPreset(2)">2</div>
+          <div class="preset-btn" onclick="doPreset(3)">3</div>
+          <div class="preset-btn" onclick="doPreset(4)">4</div>
+          <div class="preset-btn" onclick="doPreset(5)">5</div>
+          <div class="preset-btn" onclick="doPreset(6)">6</div>
+          <div class="preset-btn" onclick="doPreset(7)">7</div>
+          <div class="preset-btn" onclick="doPreset(8)">8</div>
+          <div class="preset-btn" onclick="doPreset(9)">9</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OSD / SYSTEM -->
+    <div class="panel">
+      <div class="panel-head" onclick="togglePanel(this)">
+        <span class="panel-title">System</span>
+        <span class="panel-chevron">▼</span>
+      </div>
+      <div class="panel-body">
+        <div class="btn-row">
+          <button class="btn" onclick="cmd('/menu_on')">OSD ON</button>
+          <button class="btn" onclick="cmd('/menu_off')">OSD OFF</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-warn" onclick="cmd('/power_on')">PWR ON</button>
+          <button class="btn btn-danger" onclick="cmd('/power_standby')">STANDBY</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+</main>
+
+<!-- FEEDBACK BAR -->
+<div id="feedback">
+  <span>CMD</span>
+  <span id="fb-cmd">—</span>
+  <span style="color:var(--border)">|</span>
+  <span>RESP</span>
+  <span id="fb-resp">—</span>
+  <div id="zoomInfo">
+    Zoom: 1x
+</div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────
+const state = {
+  afOn:       true,
+  expMode:    'auto',
+  wbMode:     'auto',
+  presetMode: 'recall',
+};
+
+// ── CLOCK ──────────────────────────────────────────────────────────────
+function tickClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toTimeString().slice(0, 8);
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ── CONNECTION STATUS ──────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const r = await fetch('/status');
+    const d = await r.json();
+    const dot   = document.getElementById('conn-dot');
+    const label = document.getElementById('conn-label');
+    if (d.connected) {
+      dot.classList.add('live');
+      label.textContent = 'LIVE · ' + d.ip;
+    } else {
+      dot.classList.remove('live');
+      label.textContent = 'OFFLINE';
+    }
+  } catch {
+    document.getElementById('conn-dot').classList.remove('live');
+    document.getElementById('conn-label').textContent = 'SERVER ERR';
+  }
+}
+setInterval(pollStatus, 3000);
+pollStatus();
+
+function updateZoom() {
+
+    fetch('/zoom_position')
+        .then(r => r.json())
+        .then(data => {
+
+            document.getElementById('zoomInfo').innerHTML =
+                `Zoom: ${data.zoom_ratio}x`;
+
+        });
+}
+
+setInterval(updateZoom, 500);
+
+// ── COMMAND HELPERS ────────────────────────────────────────────────────
+function setFeedback(url, resp) {
+  document.getElementById('fb-cmd').textContent  = url;
+  document.getElementById('fb-resp').textContent = resp || '—';
+}
+
+async function cmd(url) {
+  setFeedback(url, '…');
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    setFeedback(url, d.status === 'ok' ? d.message : '✗ ' + d.message);
+  } catch (e) {
+    setFeedback(url, '✗ network');
+  }
+}
+
+// ── HOLD BUTTONS (zoom / focus / iris) ────────────────────────────────
+// Fire the command immediately on press, then repeat every 250 ms while held.
+// On release, fire the stop command.
+const holdTimers = {};
+
+function holdStart(url, id) {
+  const btn = document.getElementById(id);
+  if (btn) btn.classList.add('held');
+  cmd(url);
+  holdTimers[id] = setInterval(() => cmd(url), 250);
+}
+
+function holdStop(stopUrl, id) {
+  const btn = document.getElementById(id);
+  if (btn) btn.classList.remove('held');
+  clearInterval(holdTimers[id]);
+  delete holdTimers[id];
+  cmd(stopUrl);
+}
+
+// ── AUTO FOCUS TOGGLE ──────────────────────────────────────────────────
+function toggleAF(btn) {
+  if (btn.classList.contains('on')) {
+    btn.classList.remove('on');
+    btn.textContent = 'MANUAL FOCUS';
+    cmd('/af_off');
+    state.afOn = false;
+  } else {
+    btn.classList.add('on');
+    btn.textContent = 'AUTO FOCUS';
+    cmd('/af_on');
+    state.afOn = true;
+  }
+  updateHUD();
+}
+
+// ── EXPOSURE MODE ─────────────────────────────────────────────────────
+const expBtns = { auto:'exp-auto', manual:'exp-manual', shtr:'exp-shtr', iris:'exp-iris' };
+function setExp(btn, url) {
+  Object.values(expBtns).forEach(id => document.getElementById(id)?.classList.remove('on'));
+  btn.classList.add('on');
+  cmd(url);
+  state.expMode = btn.textContent.trim().toLowerCase();
+  updateHUD();
+}
+
+// ── WHITE BALANCE ─────────────────────────────────────────────────────
+const wbBtns = ['wb-auto','wb-indoor','wb-outdoor'];
+function setWB(btn, url) {
+  wbBtns.forEach(id => document.getElementById(id)?.classList.remove('on'));
+  btn.classList.add('on');
+  cmd(url);
+  state.wbMode = btn.textContent.trim();
+  updateHUD();
+}
+
+// ── PAIRED TOGGLE (BLC / MIRROR) ───────────────────────────────────────
+function cmdTogglePair(onId, offId, url) {
+  const on  = document.getElementById(onId);
+  const off = document.getElementById(offId);
+  if (on && off) {
+    on.classList.add('on');
+    off.classList.remove('on');
+  }
+  cmd(url);
+}
+
+// ── PRESETS ───────────────────────────────────────────────────────────
+function setPresetMode(mode) {
+  state.presetMode = mode;
+  document.getElementById('pm-recall').classList.toggle('active', mode === 'recall');
+  document.getElementById('pm-set').classList.toggle('active', mode === 'set');
+}
+
+function doPreset(n) {
+  const url = state.presetMode === 'recall'
+    ? `/preset_recall/${n}`
+    : `/preset_set/${n}`;
+  cmd(url);
+  // Flash the button
+  const btns = document.querySelectorAll('.preset-btn');
+  if (btns[n]) {
+    btns[n].style.borderColor = state.presetMode === 'set' ? 'var(--amber)' : 'var(--accent)';
+    btns[n].style.color       = state.presetMode === 'set' ? 'var(--amber)' : 'var(--accent)';
+    setTimeout(() => {
+      btns[n].style.borderColor = '';
+      btns[n].style.color = '';
+    }, 600);
+  }
+}
+
+// ── HUD ───────────────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('hud-mode').textContent =
+    `AF: ${state.afOn ? 'AUTO' : 'MANUAL'} · WB: ${state.wbMode.toUpperCase()} · EXP: ${state.expMode.toUpperCase()}`;
+}
+
+// ── PANEL COLLAPSE ────────────────────────────────────────────────────
+function togglePanel(head) {
+  head.closest('.panel').classList.toggle('collapsed');
+  head.querySelector('.panel-chevron').textContent =
+    head.closest('.panel').classList.contains('collapsed') ? '▶' : '▼';
+}
+
+// ── INIT AF button text ───────────────────────────────────────────────
+document.getElementById('btn-af').classList.add('on');
+document.getElementById('btn-af').textContent = 'AUTO FOCUS';
+document.getElementById('exp-auto').classList.add('on');
+document.getElementById('wb-auto').classList.add('on');
+</script>
+</body>
+</html>
